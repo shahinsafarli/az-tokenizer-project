@@ -1,0 +1,82 @@
+\section{Problem Formulation}
+\label{sec:problem}
+
+\begin{figure*}[!t]
+\centering
+\resizebox{\textwidth}{!}{\input{figures/fig_design}}
+\caption{Experimental design. Each run is a triple (base, condition, seed) at one Azerbaijani training size $n$; a condition is a pair (tokenizer/initialisation, pre-Azerbaijani stage). Every arm passes through the same task-head reset, the same 2{,}000-step Azerbaijani budget, the same validation cadence and selection rule, and exactly one test evaluation of the restored selected checkpoint. Counts are from the frozen configuration (\file{evidence/preregistration/FROZEN.md}) and the launcher record (\file{results/launcher\_state.json}).}
+\label{fig:design}
+\end{figure*}
+
+\subsection{Notation}
+Let $\mathcal{B}=\{\text{\xlmxv},\text{\xlmr}\}$ be the base encoders, each with an original tokenizer $\tau_B$ and input-embedding matrix $\mathbf{E}_B\in\mathbb{R}^{V_B\times d_B}$ ($V_B=95{,}000,\ d_B=1024$ for \xlmxv; $V_B=250{,}002,\ d_B=768$ for \xlmr). The donor is the HPLT Azerbaijani BERT with tokenizer $\tau_D$ and embeddings $\mathbf{E}_D\in\mathbb{R}^{V_D\times d_D}$, $V_D=32{,}770$. A \emph{condition} $c=(\kappa,\pi)$ combines a tokenizer/initialisation choice $\kappa\in\{$original, donor/OMP, donor/mean, donor/random$\}$ with a pre-Azerbaijani stage $\pi\in\{$none, real TR, shuffled TR$\}$. Seven of the twelve combinations were run (Table~\ref{tab:conditions}); the remaining five (placebo initialisers with a Turkish stage, and donor tokenizer with shuffled Turkish) were frozen out of scope before the grid to keep the run count inside the compute budget, and their absence is listed as a limitation. A run is $(B,c,n,s)$ with Azerbaijani training size $n$ and seed $s$.
+
+\begin{table}[!t]
+\caption{The seven conditions. Ids and names are those of \file{configs/experiment.yaml}; ``sizes'' lists the Azerbaijani training sizes at which the condition was run for each base.}
+\label{tab:conditions}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}lllll@{}}
+\toprule
+Short & Config name (id) & Init.$^{b}$ & Pre-AZ & Sizes \\
+\midrule
+\Direct & \pfx{baza} (1) & -- & none & all$^{a}$ \\
+\OMP & \pfx{tokenizator} (3) & OMP & none & all$^{a}$ \\
+\Mean & \pfx{transplant\_mean} (6) & mean & none & all$^{a}$ \\
+\Random & \pfx{transplant\_random\_coef} (7) & random & none & all$^{a}$ \\
+\TR & \pfx{turk} (2) & -- & real TR & 500, 2000 \\
+\OMPTR & \pfx{her\_ikisi} (4) & OMP & real TR & 500, 2000 \\
+\ShufTR & \pfx{turk\_qarisiq} (5) & -- & shuf.\ TR & 500, 2000 \\
+\bottomrule
+\multicolumn{5}{@{}p{8.6cm}@{}}{$^{a}$\xlmxv: 500, 2000, 10000, 20914; \xlmr: 500, 2000. $^{b}$``--'' keeps the original tokenizer; the other three install the AZ donor tokenizer initialised by OMP ($k{=}64$), the mean of the $k$ nearest anchors, or random coefficients (seed 0).}
+\end{tabular}
+\end{table}
+
+\subsection{Estimands}
+\label{sec:problem:estimands}
+Let $F(t)$ denote validation \Fone{} of a run at optimizer step $t\in\mathcal{T}=\{200,400,\dots,2000\}$. A constant predictor on the balanced binary validation split scores $F=1/3$; we call this the \emph{collapse basin}. A run \emph{escapes} if
+\begin{equation}
+E=\mathbf{1}\!\left[\max_{t\in\mathcal{T}}F(t)>\theta\right],\qquad \theta=0.40,
+\label{eq:escape}
+\end{equation}
+where $\theta$ was fixed from pilot runs and hash-locked before the grid. The selected checkpoint is the earliest maximiser
+\begin{equation}
+t^{\ast}=\min\big\{t\in\mathcal{T}: F(t)=\max_{t'}F(t')\big\},
+\label{eq:select}
+\end{equation}
+and every run reports $F_{\mathrm{val}}=F(t^{\ast})$ and, after restoring and numerically verifying the checkpoint, $F_{\mathrm{test}}$ on the fixed test split. For a cell (base, condition, $n$) with seeds $\mathcal{S}$ we report three quantities that answer different questions and are never pooled:
+\begin{align}
+\hat p_{\mathrm{esc}} &= \tfrac{1}{|\mathcal{S}|}\textstyle\sum_{s\in\mathcal{S}}E_s, \label{eq:pesc}\\
+\bar F_{\mathrm{cond}} &= \tfrac{1}{\sum_s E_s}\textstyle\sum_{s\in\mathcal{S}}E_s\,F_s, \label{eq:fcond}\\
+\bar F_{\mathrm{all}} &= \tfrac{1}{|\mathcal{S}|}\textstyle\sum_{s\in\mathcal{S}}F_s. \label{eq:fall}
+\end{align}
+$\bar F_{\mathrm{cond}}$ describes predictive quality \emph{given} that optimisation succeeded; it is a selection on outcome and can compare disjoint survivor sets across conditions. $\bar F_{\mathrm{all}}$ charges every collapsed seed at its actual score and is the quantity a practitioner would experience without re-running seeds. \Fone{} is the unweighted mean of the per-class F1 scores,
+\begin{equation}
+\text{\Fone}=\tfrac12\sum_{y\in\{0,1\}}\frac{2\,\mathrm{TP}_y}{2\,\mathrm{TP}_y+\mathrm{FP}_y+\mathrm{FN}_y}.
+\label{eq:macrof1}
+\end{equation}
+
+\subsection{Hypotheses as contrasts, and what they identify}
+\label{sec:problem:identification}
+Each hypothesis maps to within-base contrasts on the estimands above. Table~\ref{tab:identification} states, for each contrast, what changes jointly and therefore what the contrast can and cannot isolate. Cross-base comparisons are descriptive only: the two encoders differ in architecture, non-embedding capacity (151.7M vs.\ 86.0M parameters), and pretraining coverage, so a difference between bases cannot be attributed to Azerbaijani pretraining exposure alone.
+
+\begin{table}[!t]
+\caption{Identification map: what each pre-registered contrast changes jointly and what it can therefore support. ``Isolates'' is intentionally strict.}
+\label{tab:identification}
+\centering
+\footnotesize
+\begin{tabular}{@{}L{1.75cm}L{2.55cm}L{3.75cm}@{}}
+\toprule
+Contrast & Jointly changed & Supports / does \emph{not} isolate \\
+\midrule
+\Direct\ $\to$ \OMP & vocabulary, segmentation, embedding rows, tied output rows, truncation, parameter count & net effect of the implemented transplant pipeline; \emph{not} tokenizer quality vs.\ embedding quality \\
+\OMP\ $\to$ \Mean, \OMP\ $\to$ \Random & only the coefficient solver on the same donor vocabulary and anchors & whether the fitted sparse solve beats a crude or random weighting; \emph{not} whether any initialiser is adequate \\
+\Direct\ $\to$ \TR & source-task exposure, extra optimisation, lexical overlap, word order & net effect of Turkish intermediate training; \emph{not} its mechanism \\
+\ShufTR\ $\to$ \TR & word order, fluency, source-task difficulty (multiset and labels preserved) & order-sensitive component (H1); \emph{not} syntax alone \\
+\Direct\ $\to$ \ShufTR & source exposure without natural order & lexical/optimisation component under a degraded source task \\
+\OMP\ $\to$ \OMPTR, \TR\ $\to$ \OMPTR & interaction of transplant and Turkish stage & whether the transplant offsets the Turkish outcome; \emph{not} whether Turkish knowledge transferred through donor rows \\
+\xlmxv{} vs.\ \xlmr & architecture, capacity, pretraining coverage, tokenizer scheme & descriptive contrast for H2; \emph{not} the effect of Azerbaijani pretraining exposure \\
+\bottomrule
+\end{tabular}
+\end{table}

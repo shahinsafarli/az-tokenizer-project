@@ -1,0 +1,53 @@
+% Experimental design schematic (TikZ).  Counts from evidence/preregistration/FROZEN.md
+% and results/launcher_state.json (164 runs).  No measured results are drawn here.
+\begin{tikzpicture}[
+  font=\scriptsize,
+  box/.style={draw, rounded corners=2pt, inner sep=3pt, align=center, fill=white},
+  fac/.style={box, fill=black!4, text width=3.3cm},
+  stage/.style={box, fill=blue!6, text width=3.6cm},
+  outbox/.style={box, fill=orange!8, text width=3.6cm},
+  info/.style={box, align=left, inner sep=4pt},
+  arr/.style={-{Latex[length=1.6mm]}, thick, black!70}
+]
+% ---------------- top row: factors
+\node[fac] (b1) at (0,0) {\textbf{Base encoder}\\ \xlmxv{}: AZ absent, TR present\\ \xlmr{}: AZ present};
+\node[fac] (tok) at (4.0,0) {\textbf{Tokenizer / initialisation}\\ original vocabulary, or\\ AZ donor with OMP $\mid$ Mean $\mid$ Random};
+\node[fac] (pre) at (8.0,0) {\textbf{Pre-AZ stage}\\ none, or\\ real Turkish $\mid$ shuffled Turkish};
+\node[stage] (reset) at (13.0,0) {\textbf{Task-head reset}\\ every condition, recorded per run};
+% ---------------- right column: AZ stage chain
+\node[stage, below=4mm of reset] (az) {\textbf{Azerbaijani fine-tuning}\\ 2{,}000 optimizer steps, batch 32\\ $n\in\{500, 2000\}$; \xlmxv{} also 10k, 20{,}914\\ 5 seeds ($n\le2000$), 3 seeds ($n>2000$)};
+\node[stage, below=4mm of az] (ev) {\textbf{Validation every 200 steps}\\ escape $\Leftrightarrow$ any \Fone{} $>0.40$\\ select $t^\ast$ = earliest max \Fone};
+\node[outbox, below=4mm of ev] (test) {\textbf{Restore $t^\ast$, verify, test once}\\ 4{,}186 examples; ledger append};
+% ---------------- bottom-left: conditions
+\node[info, fill=black!2, anchor=north west] (cond) at ($(b1.south west)+(0,-0.5)$) {%
+\textbf{Seven conditions} (tokenizer, pre-stage)\\[1pt]
+\Direct{} = (original, none)\\
+\OMP{} = (donor/OMP, none)\\
+\Mean{} = (donor/mean, none)\\
+\Random{} = (donor/random, none)\\
+\TR{} = (original, real TR)\\
+\OMPTR{} = (donor/OMP, real TR)\\
+\ShufTR{} = (original, shuffled TR)\\[2pt]
+$2 \times 7 \times \{500,2000\} \times 5 = 140$ runs\\
+$+\ \text{\xlmxv{}} \times 4 \times \{10000,20914\} \times 3 = 24$\\
+\textbf{= 164 runs; 164 completed; 0 failures}};
+% ---------------- bottom-middle: analysis
+\node[info, fill=green!5, anchor=north west] (ana) at ($(cond.north east)+(0.4,0)$) {%
+\textbf{Analysis (pre-registered)}\\[1pt]
+escape rate + Wilson 95\% CI\\
+conditional \Fone{} (escaped seeds) + bootstrap CI\\
+all-seed \Fone{} + bootstrap CI\\
+96 within-base contrasts, 86 measurable\\
+Welch $t$ + Holm over the family\\
+paired $t$, Fisher, all-seed: diagnostics\\
+test: confirmation of validation survivors\\
+exact sign-flip floor $= 2/2^5 = 0.0625$};
+% ---------------- arrows
+\draw[arr] (b1) -- (tok);
+\draw[arr] (tok) -- (pre);
+\draw[arr] (pre) -- (reset);
+\draw[arr] (reset) -- (az);
+\draw[arr] (az) -- (ev);
+\draw[arr] (ev) -- (test);
+\draw[arr, dashed] (test.west) -| ($(ana.south)+(0.6,0)$);
+\end{tikzpicture}

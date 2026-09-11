@@ -1,0 +1,110 @@
+\appendices
+
+\section{Complete 36-Cell Results}
+\label{app:cells}
+Table~\ref{tab:allcells} lists every cell of the grid with escape rate and Wilson interval, conditional and all-seed validation \Fone{} with bootstrap intervals, test \Fone{} at the restored selected checkpoint, the number of seeds that escaped mid-training but ended collapsed, and the number of degenerate Turkish source stages.
+
+\begin{table*}[!t]
+\caption{All 36 cells (\file{results/summary.csv}; test columns from T1 of \file{evidence/supplemental/test\_tables\_received.md}; both exact aggregates of \file{results/runs/*.json}). Wilson and bootstrap intervals are 95\%; ``E$\to$C'' is escaped-then-terminal-collapsed seeds; ``TR deg.'' is degenerate Turkish source stages (-- for conditions without a Turkish stage).}
+\label{tab:allcells}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}lrlclrlrlrlrcc@{}}
+\toprule
+ & & & \multicolumn{2}{c}{Escape} & \multicolumn{2}{c}{Val.\ cond.} & \multicolumn{2}{c}{Val.\ all-seed} & \multicolumn{2}{c}{Test cond.} & Test & & TR \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}\cmidrule(lr){10-11}
+Base & $n$ & Condition & rate & Wilson & \Fone & CI & \Fone & CI & \Fone & CI & all-seed & E$\to$C & deg. \\
+\midrule
+\input{tables/tab_all_cells}
+\end{tabular}
+\end{table*}
+
+\section{The 27 Holm-Surviving Contrasts and Their Test Confirmation}
+\label{app:survivors}
+Table~\ref{tab:survivors} lists the contrasts that survive Holm correction over the 86-test validation family, with the paired $t$ test on test \Fone{} over the same five seeds and the Holm adjustment within the 27. All 27 are \xlmr{} contrasts; every seed difference has the same sign on both splits; the exact sign-flip $p$ is $0.0625$ for every row on both splits; mean shrinkage $|\Delta_{\mathrm{test}}|/|\Delta_{\mathrm{val}}|$ is 0.874.
+
+\begin{table}[!t]
+\caption{Validation survivors and test confirmation (T5 of \file{evidence/supplemental/test\_tables\_received.md}; \file{results/stats.csv}).}
+\label{tab:survivors}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{1.4pt}
+\begin{tabular}{@{}rlrrrrr@{}}
+\toprule
+$n$ & Contrast & $\Delta$ val & $\Delta$ test & $t$ (test) & $p$ (test) & Holm/27 \\
+\midrule
+\input{tables/tab_survivors}
+\end{tabular}
+\end{table}
+
+\section{All Paired Contrasts}
+\label{app:paired}
+Table~\ref{tab:pairedall} reports the paired validation and test differences on seeds that escaped in both arms for the 42 key contrasts of the companion table (38 with at least one shared seed), together with the all-seed differences, for both bases.
+
+\begin{table*}[!t]
+\caption{Paired and all-seed contrasts, both bases (T2 of \file{evidence/supplemental/test\_tables\_received.md}). ``n/a'': no seed escaped in both arms.}
+\label{tab:pairedall}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lrlrrrcrr@{}}
+\toprule
+Base & $n$ & Contrast & $\Delta$ val (paired) & $\Delta$ test (paired) & Shared & Same sign & $\Delta$ val (all-seed) & $\Delta$ test (all-seed) \\
+\midrule
+\input{tables/tab_paired_all}
+\end{tabular}
+\end{table*}
+
+\section{Frozen Configuration}
+\label{app:config}
+{\raggedright\footnotesize
+The frozen \file{configs/experiment.yaml} (hash-locked in \file{configs/CONFIG\_HASHES.lock}) fixes: seeds \pfx{[42, 1337, 13, 7, 2024]} and \pfx{seeds\_high\_resource [42, 1337, 13]}; \pfx{deterministic: true}; models \pfx{FacebookAI/xlm-mlm-tlm-xnli15-1024} (primary), \pfx{xlm-roberta-base} (contrast), donor \pfx{HPLT/hplt\_bert\_base\_az} at revision \pfx{a126552c3073\ldots}; \pfx{max\_length 256}; data \pfx{LocalDoc/sentiments\_dataset\_azerbaijani} (split \pfx{train}, \pfx{hf\_revision null}, \pfx{exclude\_labels [neutral]}) and \pfx{maydogan/Turkish\_SentimentAnalysis\_TRSAv1} (\pfx{max\_examples 20000}); split seed 12345 with \pfx{val\_ratio 0.10}, \pfx{test\_ratio 0.15}; \pfx{train\_sizes [500, 2000, 10000, 20914]}; transplant \pfx{method omp}, \pfx{k 64}, \pfx{n\_candidates 256}, \pfx{normalize true}, \pfx{rescale\_reconstructed true}, \pfx{seed 0}; training \pfx{lr 2.0e-5}, \pfx{max\_steps 2000}, \pfx{epochs\_tr 2}, \pfx{batch\_size 32}, \pfx{grad\_accum 1}, \pfx{warmup\_ratio 0.1}, \pfx{weight\_decay 0.01}, \pfx{fp16 true}, \pfx{early\_stopping\_patience null}, \pfx{eval\_every\_steps 200}, \pfx{eval\_batch\_size 64}, \pfx{metric macro\_f1}, \pfx{metric\_for\_best\_model eval\_macro\_f1}, \pfx{load\_best\_model\_at\_end true}; the seven conditions of Table~\ref{tab:conditions}; analysis \pfx{bootstrap\_iters 10000}, \pfx{alpha 0.05}, \pfx{reference\_size 2000}; and run control \pfx{priority\_first true}, \pfx{skip\_existing true}, \pfx{cache\_turkish\_stages true}, \pfx{contrast\_sizes [500, 2000]}, \pfx{parallel\_streams 1}, \pfx{vram\_ceiling\_gb 10.0}, \pfx{vram\_per\_stream\_gb 8.6}. The escape threshold $0.40$ is a code constant recorded in every run file (\pfx{escape\_threshold}).\par}
+
+\section{Evidence Map and Reporting Checklist}
+\label{app:evidence}
+Table~\ref{tab:evidence} maps each class of claim to the file that backs it; all paths are relative to the repository root. The following qualifications are mandatory wherever these results are summarised: the grid completed 164/164 runs; conditional \Fone{} excludes failed seeds and is never pooled with all-seed \Fone; all 27 primary Holm survivors are \xlmr{} contrasts; five-seed exact paired inference has a two-sided floor of 0.0625; 14/30 \xlmxv{} Turkish stages are degenerate; retained-label agreement is 65.67\% without conditioning; the pre-grid and grid splits differ by one example; and peak GPU memory is \NM. Omitting any of these would materially overstate the evidence.
+
+\begin{table}[!t]
+\caption{Evidence map.}
+\label{tab:evidence}
+\centering
+\scriptsize
+\begin{tabular}{@{}L{2.2cm}L{6.3cm}@{}}
+\toprule
+Claim class & Backing files \\
+\midrule
+Run completeness, timing & \file{results/launcher\_state.json}; \file{results/logs/*.log}; \file{run.log} \\
+Per-run observations & 164 schema-v4 files in \file{results/runs/}; \file{results/aggregate.csv} \\
+Cell summaries & \file{results/summary.csv}, \file{summary.json}, \file{paper\_tables.md} \\
+Inference family & \file{results/stats.csv}, \file{stats.json} (\pfx{p\_adjusted\_holm}, \pfx{survives\_\allowbreak family\_\allowbreak correction}) \\
+Test confirmation, exact floor & \file{evidence/supplemental/\allowbreak test\_tables\_received.md} (T1–T6); \file{results/test\_evaluation\_\allowbreak ledger.jsonl} \\
+Splits, manifests, leakage & \file{results/splits.json}; \file{data.tgz} snapshot \\
+Label audit (pre-grid) & \file{evidence/carried\_forward\_\allowbreak pre\_grid/} (\file{PROVENANCE.md}, \file{label\_audit*.csv}) \\
+Anchors, transplants, controls & \file{results/anchors.json}; \file{transplant\_\_*.json}; \file{controls\_\_*.json}; \file{embedding\_norm\_\allowbreak report\_\_*.json}; \file{cross\_base\_\allowbreak transplant\_quality.json}; \file{top1\_accuracy.json} \\
+Tokenizer diagnostics & \file{results/overlap\_control.json}; \file{fertility.json}; \file{truncation.json}; \file{scramble.json}; \file{evidence/carried\_forward\_\allowbreak pre\_grid/diacritics.json} \\
+Error taxonomy & \file{results/errors.json}; \file{errors\_manual\_sample.csv} \\
+Environment, compute & \file{evidence/environment/} (\file{ENVIRONMENT\_\allowbreak AS\_RUN.md}, \file{env\_*\_as\_run.txt}, regenerated pins) \\
+Pre-registration & \file{evidence/preregistration/} (\file{experiment.yaml}, \file{FROZEN.md}, \file{CONFIG\_\allowbreak HASHES.lock}) \\
+Figures and tables of this paper & \file{report/ieee/figures/\allowbreak make\_*.py}, \file{report/ieee/tables/\allowbreak make\_tables.py} \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\section{Qualitative Segmentation Probes}
+\label{app:probes}
+Table~\ref{tab:probes} shows how the three tokenizers segment seven Azerbaijani probe words (\file{results/fertility.json}): \xlmxv{} splits inflected words into 3–10 pieces, several of them single characters, and maps ə to an isolated piece; \xlmr{} and the donor keep most words in one or two pieces. These are illustrations of the fertility gap in Table~\ref{tab:tokenizer}, not corpus-level estimates.
+
+\begin{table*}[!t]
+\caption{Segmentation of seven Azerbaijani probe words (\file{results/fertility.json}); the number of pieces in parentheses. \textvisiblespace{} marks a word-initial SentencePiece marker; $\cdot$ marks the fastBPE end-of-word marker.}
+\label{tab:probes}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.5pt}
+\begin{tabular}{@{}llll@{}}
+\toprule
+Word & \xlmxv{} pieces (\#) & \xlmr{} pieces (\#) & AZ donor pieces (\#) \\
+\midrule
+\input{tables/tab_probes}
+\end{tabular}
+\end{table*}

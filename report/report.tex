@@ -1,0 +1,109 @@
+% IEEE conference paper -- DLE-AI-202 Final Project, Track 1
+% Build: latexmk -pdf report.tex   (pdflatex + bibtex; see build.ps1 / build.sh)
+\documentclass[conference]{IEEEtran}
+\IEEEoverridecommandlockouts
+
+% ---------------------------------------------------------------- encoding / fonts
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{newtxtext}   % Times-like text, the conventional IEEE look
+\usepackage{newtxmath}   % matching maths
+\usepackage{textcomp}
+\usepackage{newunicodechar}
+\usepackage{graphicx}
+\newunicodechar{ə}{\rotatebox[origin=c]{180}{e}}
+\newunicodechar{Ə}{\rotatebox[origin=c]{180}{E}}
+\newunicodechar{→}{$\rightarrow$}
+\newunicodechar{Δ}{$\Delta$}
+\newunicodechar{–}{--}
+\newunicodechar{—}{---}
+\newunicodechar{≈}{$\approx$}
+\newunicodechar{≥}{$\geq$}
+\newunicodechar{≤}{$\leq$}
+\newunicodechar{×}{$\times$}
+\newunicodechar{·}{$\cdot$}
+
+% ---------------------------------------------------------------- packages
+\usepackage{amsmath}     % amssymb/amsfonts symbols come from newtxmath
+\usepackage{bm}
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{threeparttable}
+\usepackage{xcolor}
+\usepackage{url}
+\usepackage{cite}
+\usepackage{microtype}
+\usepackage{enumitem}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning,shapes.geometric,fit,calc}
+\usepackage[ruled,linesnumbered,noend]{algorithm2e}
+\SetAlFnt{\footnotesize}
+\SetAlCapFnt{\footnotesize}
+\SetAlCapNameFnt{\footnotesize}
+\usepackage{stfloats}
+\usepackage[hidelinks,breaklinks]{hyperref}
+\hypersetup{pdftitle={Cross-lingual Transfer between Azerbaijani and Turkish: Separating Syntactic Transfer, Lexical Warm-Up, and Tokenizer Quality},
+            pdfauthor={Alibabayeva, Allahverdiyev, Baghirova, Jafarov, Safarli}}
+
+% ---------------------------------------------------------------- macros
+\newcommand{\Fone}{macro-F1}
+\newcommand{\xlmxv}{XLM-15}
+\newcommand{\xlmr}{XLM-R}
+\newcommand{\Direct}{\textsc{Direct}}
+\newcommand{\OMP}{\textsc{Omp}}
+\newcommand{\Mean}{\textsc{Mean}}
+\newcommand{\Random}{\textsc{Random}}
+\newcommand{\TR}{\textsc{Tr}}
+\newcommand{\OMPTR}{\textsc{Omp+Tr}}
+\newcommand{\ShufTR}{\textsc{Shuf.\,Tr}}
+\newcommand{\file}[1]{\texttt{\small #1}}
+\newcommand{\NM}{\textsc{not measured}}
+\newcommand{\pfx}[1]{\texttt{#1}}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
+\newcolumntype{R}[1]{>{\raggedleft\arraybackslash}p{#1}}
+\newcolumntype{C}[1]{>{\centering\arraybackslash}p{#1}}
+\setlength{\tabcolsep}{4pt}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+
+% one author cell: name / affiliation / city / email, centred, top-aligned across a row
+\newcommand{\authcell}[2]{\begin{tabular}[t]{@{}c@{}}{\normalsize #1}\\[1pt]{\footnotesize AI Academy}\\{\footnotesize National Artificial Intelligence Center}\\{\footnotesize Baku, Azerbaijan}\\{\footnotesize #2}\end{tabular}}
+
+\begin{document}
+
+\title{Cross-lingual Transfer\\ between Azerbaijani and Turkish:\\ Separating Syntactic Transfer, Lexical Warm-Up,\\ and Tokenizer Quality}
+
+\author{%
+\renewcommand{\arraystretch}{1.0}%
+\begin{tabular}{@{}c@{\hspace{5mm}}c@{\hspace{5mm}}c@{}}
+\authcell{Alibabayeva, Fatima}{fatime.elibabayeva25@aiacademy.az} &
+\authcell{Allahverdiyev, Suleyman}{suleyman.allahverdiyev25@aiacademy.az} &
+\authcell{Baghirova, Fidan}{fidan.bagirova25@aiacademy.az}
+\end{tabular}\\[3mm]
+\begin{tabular}{@{}c@{\hspace{14mm}}c@{}}
+\authcell{Jafarov, Emil}{emil.jafarov.II@aiacademy.az} &
+\authcell{Safarli, Shahin}{sahin.seferli25@aiacademy.az}
+\end{tabular}%
+}
+
+\maketitle
+
+\input{sections/00_abstract}
+
+\input{sections/01_introduction}
+\input{sections/02_related}
+\input{sections/03_problem}
+\input{sections/04_method}
+\input{sections/05_setup}
+\input{sections/06_results}
+\input{sections/07_discussion}
+\input{sections/08_limitations}
+\input{sections/09_conclusion}
+\input{sections/10_ack}
+
+\bibliographystyle{IEEEtran}
+\bibliography{refs}
+
+\input{sections/11_appendix}
+
+\end{document}

@@ -1,0 +1,20 @@
+\section{Limitations and Threats to Validity}
+\label{sec:limitations}
+
+\paragraph{Construct validity} Tokenizer replacement jointly changes segmentation, vocabulary, embedding rows, tied output rows, truncation (1.257\%$\to$0.351\% of examples for \xlmxv), and parameter count. Word shuffling changes order, fluency, and source-task difficulty. Neither contrast isolates a single linguistic mechanism; Table~\ref{tab:identification} is the binding statement of what is identified. Five of the twelve (tokenizer, pre-stage) combinations---the placebos with a Turkish stage and the donor tokenizer with shuffled Turkish---were not run, so the interaction between transplant quality and the Turkish stage is observed only for OMP.
+
+\paragraph{Model confounding} The bases differ in architecture, pretraining coverage, tokenizer scheme, and non-embedding capacity ($1.8\times$). Cross-base differences cannot be attributed to Azerbaijani pretraining exposure alone, and the two encoders were not matched on any of these axes.
+
+\paragraph{Optimisation validity} All cells receive the same 2{,}000-step budget despite dataset sizes spanning $42\times$, so the size sweep measures a fixed-budget regime. \xlmxv{} collapses in 34 of 94 runs, 14 of its 30 Turkish source stages are degenerate, and several conditional cells contain one or two observations. The experiment does not measure converged performance, and it does not measure tokenizer adaptation followed by continued pretraining.
+
+\paragraph{Statistical validity} Only five (or three) seeds exist before escape conditioning. Exact paired inference cannot cross $p=0.05$ with five seeds; every significance statement is model-based. Max-validation checkpoint selection and validation reporting use the same observations, which is why the test split is reported and why its gap is negative. Escape-rate contrasts have no power at this seed count. Holm control is applied to the pre-registered Welch family only; the paired, all-seed, and Fisher analyses are diagnostics.
+
+\paragraph{Data and label validity} The upstream Azerbaijani revision is unpinned; the archived \file{data.tgz} is the only exact copy and the manifests are the only proof of identity. Pre-grid and grid splits differ by one example, so the human audit characterises the dataset, not the holdout. Unconditioned retained-label agreement is 65.67\%, and the two annotators differ by nine points against gold; a non-trivial share of test labels is therefore uncertain, which bounds attainable \Fone{} and adds noise common to all conditions. Both datasets are user-generated sentiment text; the study does not speak to other domains or to formal Azerbaijani.
+
+\paragraph{Test-protocol validity} The 164-entry ledger shows one test evaluation per run, at the verified restored checkpoint. Test-side inference is confirmation of validation-selected survivors, not discovery, and its paired tests inherit the five-seed exact floor.
+
+\paragraph{Reproducibility and resources} The original lock did not describe the executed stack; two dependencies were undeclared; per-run weights and the Turkish cache are not distributed; peak GPU memory during the grid is \NM; the grid ran on a rented H100 rather than the course workstation, in one stream. A clean-checkout reproduction on the course machine was not performed within the project window.
+
+\paragraph{External validity} Evidence is limited to one binary sentiment dataset, one Turkish source task, one donor tokenizer, one sparse-reconstruction configuration ($k=64$, $m=256$, functional anchors), and two unmatched encoders. It does not establish transfer to other tasks, Azerbaijani varieties, donors, or architectures, and $k$ and $m$ were not ablated.
+
+\paragraph{Licensing} LocalDoc is CC-BY-NC-SA-4.0, \xlmxv{} is CC-BY-NC-4.0, the HPLT donor is Apache-2.0, \xlmr{} is MIT, and the captured TRSAv1 card declares no licence. Redistribution rights must be checked per artefact; the non-commercial terms bind any downstream use of the dataset and of \xlmxv{}-derived checkpoints.
