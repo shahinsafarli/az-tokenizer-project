@@ -1,0 +1,33 @@
+\section{Introduction}
+\label{sec:intro}
+
+Multilingual encoders such as XLM \cite{lample2019xlm} and XLM-R \cite{conneau2020xlmr} are the default starting point for text classification in languages with little labelled data. Azerbaijani is a representative case: a Turkic language written in Latin script with roughly ten million speakers, a small labelled-data ecosystem, uneven coverage in multilingual pretraining corpora \cite{wu2020alllanguages}, and a close, high-resource relative---Turkish---with which it shares much vocabulary and morphology. Two adaptation strategies therefore suggest themselves. The first is \emph{intermediate training} on Turkish before Azerbaijani fine-tuning, in the spirit of STILTs \cite{phang2018stilts,pruksachatkun2020intermediate}; Kardeş-NLU \cite{senel2024kardes} reports that such a ``high-resource cousin'' stage helps Turkic targets. The second is \emph{tokenizer transplantation}: replacing the encoder's vocabulary with one trained for the target language and initialising the new embedding rows without gradient updates, most recently by orthogonal matching pursuit (OMP) over shared anchor tokens \cite{goddard2025omp}, following a line of embedding-initialisation work \cite{minixhofer2022wechsel,dobler2023focus,gee2022fvt,minixhofer2024zett}.
+
+\subsection{The identification problem}
+A gain after Turkish training would not by itself reveal \emph{why} Azerbaijani performance changed. It could reflect order-sensitive syntactic transfer, shared sentiment-bearing vocabulary, extra task optimisation on a larger corpus, or a different interaction with the pretrained tokenizer. Tokenizer replacement is a second compound intervention: it changes segmentation efficiency, the vocabulary, the embedding table, the truncation pattern, the tied output rows, and the total parameter count at once. Two base encoders add a third layer of confounding, because they differ in architecture, capacity, and pretraining-language coverage. A study that reports one accuracy number per pipeline can rank the pipelines but cannot attribute the ranking to a mechanism. This paper is therefore deliberately titled a \emph{comparison}: it measures what each implemented pipeline does under a fixed protocol, states which contrasts the design identifies, and refuses the mechanistic claims it cannot support.
+
+\subsection{Research questions and hypotheses}
+Under a fixed 2{,}000-optimizer-step Azerbaijani fine-tuning protocol, we ask how Turkish intermediate training and Azerbaijani donor-tokenizer initialisation compare in
+\begin{enumerate}[label=(\roman*),leftmargin=*,nosep]
+  \item the probability of escaping classifier collapse (a constant-prediction basin at \Fone{}~$=1/3$),
+  \item validation \Fone{} conditional on escape and over all seeds, and
+  \item test \Fone{} of the restored validation-selected checkpoint.
+\end{enumerate}
+Two conditional hypotheses were fixed before the grid ran:
+\begin{itemize}[leftmargin=*,nosep]
+  \item \textbf{H1 (order-sensitive transfer).} If Turkish intermediate training helps through order-sensitive structure rather than lexical overlap or extra optimisation alone, real Turkish training will outperform a word-shuffled Turkish control that preserves every example's word multiset and label.
+  \item \textbf{H2 (segmentation bottleneck).} If \xlmxv{}'s poor Azerbaijani segmentation is a binding bottleneck \emph{and} OMP-reconstructed embeddings are usable, donor-tokenizer initialisation will help \xlmxv{} more than \xlmr{}, whose pretraining already covers Azerbaijani.
+\end{itemize}
+Neither hypothesis licenses a single-mechanism causal claim; Section~\ref{sec:problem} makes the identification limits explicit.
+
+\subsection{Contributions}
+\begin{enumerate}[leftmargin=*,nosep]
+  \item A completed, pre-registered 164-run comparison of seven adaptation pipelines across two encoders, two primary data sizes, and a higher-data stress test, with zero failed runs and every number traceable to a committed artefact (Section~\ref{sec:setup}).
+  \item Failure-aware reporting: escape probability with Wilson intervals, conditional and all-seed \Fone{} with bootstrap intervals, never pooled, plus training trajectories that show \emph{when} collapse happens (Section~\ref{sec:res:escape}).
+  \item A multiplicity-controlled inference family (86 Welch contrasts, Holm-corrected), a test-side confirmation restricted to the 27 validation survivors, and an exact sign-flip analysis that states the distribution-free floor of a five-seed design (Sections~\ref{sec:res:effects}--\ref{sec:res:exact}).
+  \item Intrinsic transplant diagnostics---anchor identification modes, masked-token top-1 accuracy, bits per character, embedding-norm calibration, and bit-exact fidelity controls---that independently corroborate the downstream failure of the implemented OMP transplant on \xlmr{} (Section~\ref{sec:res:intrinsic}).
+  \item Source-stage degeneracy accounting for Turkish intermediate training (14 of 30 \xlmxv{} stages degenerate), an explicit audit of data provenance, label quality, software, compute, and test-set usage, and a claim-by-claim evidence map (Appendix~\ref{app:evidence}).
+\end{enumerate}
+
+\subsection{Organisation}
+Section~\ref{sec:related} reviews related work. Section~\ref{sec:problem} formalises the conditions, estimands, and identification map. Section~\ref{sec:method} describes anchor identification, OMP transplantation, the placebo initialisers, the Turkish stage and its control, the training procedure, and the statistical plan. Section~\ref{sec:setup} documents data, pre-registration, the grid, the test protocol, compute, and reproducibility. Section~\ref{sec:results} presents tokenizer-level, intrinsic, and downstream results. Sections~\ref{sec:discussion} and~\ref{sec:limitations} interpret the evidence and its limits; Section~\ref{sec:conclusion} concludes. Appendices give the complete 36-cell results, all contrasts, the frozen configuration, and the evidence map.

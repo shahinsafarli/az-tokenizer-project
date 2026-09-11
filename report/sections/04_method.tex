@@ -1,0 +1,229 @@
+\section{Method}
+\label{sec:method}
+
+\subsection{Base encoders and donor}
+\label{sec:method:models}
+Table~\ref{tab:models} lists the three models. The primary encoder is the 15-language XLM MLM+TLM checkpoint fine-tuned on XNLI (\file{FacebookAI/xlm-mlm-tlm-xnli15-1024}), whose documented pretraining languages include Turkish but not Azerbaijani; it uses a 95k fastBPE vocabulary with lower-casing and accent removal, which is why its vocabulary contains no token with the letters ş, ç, ö, ü or ğ (Section~\ref{sec:res:tokenizer}). The contrast encoder is \file{xlm-roberta-base}, pretrained on 100 languages including Azerbaijani with a 250k SentencePiece vocabulary. The donor is \file{HPLT/hplt\_bert\_base\_az}, pinned at revision \pfx{a126552c3073}, a byte-level SentencePiece model with 32{,}770 tokens trained on Azerbaijani.
+
+Total parameter counts conflate the vocabulary-dependent embedding table with the vocabulary-independent encoder, so we decompose them. Transplantation leaves every encoder layer, attention and feed-forward weight, layer norm, and (for \xlmxv) position and language embedding bit-for-bit unchanged; the 25.6\% and 60.0\% total-parameter reductions are entirely the smaller embedding table. The two \emph{encoders} are not capacity-matched (151.7M vs.\ 86.0M non-embedding parameters, a $1.8\times$ factor), which is one reason cross-base contrasts are descriptive.
+
+\begin{table}[!t]
+\caption{Models. Parameter counts measured from the loaded architectures (\file{HANDOFF.md} §14); embedding parameters are the input token table only.}
+\label{tab:models}
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3pt}
+\begin{tabular}{@{}L{2.75cm}R{1.85cm}R{1.85cm}R{1.85cm}@{}}
+\toprule
+ & \xlmxv & \xlmr & AZ donor \\
+\midrule
+Hugging Face id & \pfx{xlm-mlm-tlm-}\newline\pfx{xnli15-1024} & \pfx{xlm-roberta-}\newline\pfx{base} & \pfx{HPLT/hplt\_}\newline\pfx{bert\_base\_az} \\
+Role & primary & contrast & donor \\
+Azerbaijani in pretraining & no & yes & yes (only) \\
+Turkish in pretraining & yes & yes & no \\
+Tokenizer scheme & fastBPE & SentencePiece & SentencePiece, byte \\
+Vocabulary & 95{,}000 & 250{,}002 & 32{,}770 \\
+Hidden size & 1024 & 768 & 768 \\
+Embedding params (original) & 97{,}280{,}000 & 192{,}001{,}536 & -- \\
+Embedding params (transplanted) & 33{,}556{,}480 & 25{,}167{,}360 & -- \\
+Non-embedding params & 151{,}698{,}434 & 86{,}043{,}650 & -- \\
+Total (original / transplanted) & 249.0M / 185.3M & 278.0M / 111.2M & -- \\
+Licence & CC-BY-NC-4.0 & MIT & Apache-2.0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Anchor identification}
+\label{sec:method:anchors}
+Transplantation needs a set of \emph{anchors}: donor tokens that also exist in the base vocabulary, so that their donor- and base-space embeddings are both available. Three identification modes were measured (Table~\ref{tab:anchors}). \emph{Strict} intersects canonical token strings including word-boundary markers; \emph{surface} intersects boundary-stripped strings and can mis-pair a word-final donor piece with a word-initial base piece; \emph{functional}, the pre-registered default, asks the base tokenizer itself. For each donor token $v$ with stripped surface $\sigma(v)$,
+\begin{equation}
+\mathcal{A}=\Big\{(v,u):\ \mathrm{enc}_{\tau_B}(\sigma(v))=\langle u\rangle,\ u\notin\mathcal{U}_B\Big\},
+\label{eq:anchor}
+\end{equation}
+where $\mathrm{enc}_{\tau_B}$ encodes without special tokens and $\mathcal{U}_B$ is the set of unknown and special ids. The exclusion of $\mathcal{U}_B$ matters: a surface the base tokenizer cannot represent encodes to exactly one token, \pfx{<unk>}, and without the exclusion such pairs would bind donor rows to the UNK vector and pull every reconstruction toward it (Amendment~8.2 in the frozen specification). The standalone surface is tried first, then the surface with a leading space; both variants are counted, and in the final evidence all matches were standalone. Algorithm~\ref{alg:anchors} states the procedure. Seven special-token rows are aligned separately and added to the anchor set at installation time, giving 8{,}054 and 9{,}783 mapped rows for 8{,}047 and 9{,}776 lexical anchors.
+
+\begin{table*}[!t]
+\caption{Anchor identification. Counts from \file{results/anchors.json}; ``naive'' is the raw string intersection before canonicalisation; share is functional anchors over the donor vocabulary of 32{,}770; ``unfamiliar'' tokens receive reconstructed embeddings.}
+\label{tab:anchors}
+\centering
+\footnotesize
+\begin{tabular}{@{}llrrrrrrr@{}}
+\toprule
+Base & Scheme & $V_B$ & Naive & Strict & Surface & Functional & Share (\%) & Unfamiliar \\
+\midrule
+\input{tables/tab_anchors}
+\end{tabular}
+\end{table*}
+
+\begin{algorithm}[!t]
+\caption{Functional anchor identification (\file{src/tokenization/anchor\_map.py})}
+\label{alg:anchors}
+\KwIn{base tokenizer $\tau_B$ with invalid ids $\mathcal{U}_B=\{\mathrm{unk}\}\cup\mathrm{special}$; donor vocabulary $\{(v,\text{str}_v)\}$}
+\KwOut{anchor pairs $\mathcal{A}$; unfamiliar donor ids $\mathcal{V}_{\mathrm{unf}}$}
+$\mathcal{A}\leftarrow\emptyset$\;
+\ForEach{donor id $v$ in ascending order}{
+  $\sigma\leftarrow$ decoded surface of $\text{str}_v$, boundary marker stripped\;
+  \lIf{$\sigma=\varnothing$}{\textbf{continue}}
+  \ForEach{$x\in(\sigma,\ \text{``\textvisiblespace''}\!+\!\sigma)$}{
+    $\mathbf{u}\leftarrow\mathrm{enc}_{\tau_B}(x)$ without special tokens\;
+    \If{$|\mathbf{u}|=1$ \KwSty{and} $u_1\notin\mathcal{U}_B$}{
+      $\mathcal{A}\leftarrow\mathcal{A}\cup\{(v,u_1)\}$; \textbf{break}\;
+    }
+  }
+}
+$\mathcal{V}_{\mathrm{unf}}\leftarrow\{v: (v,\cdot)\notin\mathcal{A}\}\setminus\mathrm{special}$\;
+\Return{$\mathcal{A},\ \mathcal{V}_{\mathrm{unf}}$}
+\end{algorithm}
+
+\subsection{OMP embedding reconstruction and coefficient transfer}
+\label{sec:method:omp}
+Let $\mathbf{D}_{\mathcal{A}}\in\mathbb{R}^{|\mathcal{A}|\times d_D}$ and $\mathbf{B}_{\mathcal{A}}\in\mathbb{R}^{|\mathcal{A}|\times d_B}$ hold the donor- and base-space embeddings of the anchors, with $\tilde{\mathbf{d}}_a=\mathbf{d}_a/\|\mathbf{d}_a\|_2$ the $\ell_2$-normalised donor rows. For an unfamiliar donor token $v$ with normalised embedding $\tilde{\mathbf{d}}_v$, the candidate set is the $m=256$ anchors with the highest donor-space cosine similarity, sorted in decreasing order,
+\begin{equation}
+\mathcal{C}(v)=\operatorname{top}_{m}\big\{a\in\mathcal{A}:\ \tilde{\mathbf{d}}_v^{\top}\tilde{\mathbf{d}}_a\big\},
+\label{eq:candidates}
+\end{equation}
+and the coefficients solve the $k$-sparse least-squares problem
+\begin{equation}
+\bm{\alpha}_v=\arg\min_{\bm{\alpha}\in\mathbb{R}^{m}}\big\|\tilde{\mathbf{d}}_v-\tilde{\mathbf{D}}_{\mathcal{C}(v)}^{\top}\bm{\alpha}\big\|_2^2\quad\text{s.t.}\quad\|\bm{\alpha}\|_0\le k,\ k=64,
+\label{eq:omp}
+\end{equation}
+approximately, by orthogonal matching pursuit \cite{pati1993omp,tropp2007omp} (scikit-learn's \pfx{OrthogonalMatchingPursuit}, no intercept). The coefficients, not the vector, are transferred: the base-space row is
+\begin{equation}
+\hat{\mathbf{b}}_v=\sum_{a\in\mathcal{C}(v)}\alpha_{v,a}\,\mathbf{b}_a ,
+\label{eq:transfer}
+\end{equation}
+using the \emph{unnormalised} base anchor rows, so that $\hat{\mathbf{b}}_v$ lives on the base model's own scale and $d_D\neq d_B$ is permitted. Restricting to $m=256<d_D=768$ keeps the dictionary undercomplete, which the implementation warns is required for greedy selection to be reliable. The candidate sorting in \eqref{eq:candidates} is what makes the mean placebo below well defined (Amendment~8.1).
+
+\subsection{Placebo initialisers and norm rescaling}
+\label{sec:method:placebo}
+Two placebos use the same donor vocabulary, anchors, and candidate sets but replace the solver:
+\begin{align}
+\alpha^{\mathrm{mean}}_{v,a}&=\tfrac{1}{k}\,\mathbf{1}\big[a\in\mathcal{N}_k(v)\big], \label{eq:mean}\\
+\alpha^{\mathrm{rand}}_{v,a}&=\frac{z_a\,\mathbf{1}[a\in\mathcal{R}_k(v)]}{\sum_{a'\in\mathcal{R}_k(v)}|z_{a'}|},\qquad z_a\sim\mathcal{N}(0,1), \label{eq:random}
+\end{align}
+where $\mathcal{N}_k(v)$ is the set of the $k$ nearest candidates (the first $k$ of the sorted $\mathcal{C}(v)$) and $\mathcal{R}_k(v)$ is a set of $k$ candidates drawn uniformly without replacement from $\mathcal{C}(v)$, with one fixed realisation (transplant seed 0). \Mean{} asks whether the fitted sparse solve beats the crudest sensible weighting; \Random{} asks whether \emph{any} placement in the anchor span, with the same sparsity, already delivers whatever benefit the pipeline has. Each transplant artefact is built once; downstream seeds vary fine-tuning only.
+
+A measurement on the raw reconstructions showed that \eqref{eq:transfer} inflates \xlmr{} rows: the median norm of reconstructed rows was $1.9091\times$ that of the base anchor rows (\xlmxv: $1.1324\times$; Section~\ref{sec:res:intrinsic}). Because the pre-registered principle is that reconstructed rows must live at the base model's own scale, every installed artefact, for both bases and all three initialisers, rescales each reconstructed row to the median anchor norm while preserving its direction:
+\begin{equation}
+\hat{\mathbf{b}}_v\leftarrow\hat{\mathbf{b}}_v\cdot\frac{\operatorname{median}_{a\in\mathcal{A}}\|\mathbf{b}_a\|_2}{\|\hat{\mathbf{b}}_v\|_2}.
+\label{eq:rescale}
+\end{equation}
+The six installed artefacts all report a reconstructed-to-anchor median-norm ratio of exactly 1.000 (Table~\ref{tab:fidelity}).
+
+\subsection{Installing the transplant}
+The donor tokenizer replaces the base tokenizer; the input-embedding table is resized to $V_D$ and filled with the anchors' own base rows for $a\in\mathcal{A}$, the aligned special-token rows, and $\hat{\mathbf{b}}_v$ for $v\in\mathcal{V}_{\mathrm{unf}}$; the tied masked-LM output projection receives the same matrix and weights are re-tied. Nothing else in the checkpoint is modified. Algorithm~\ref{alg:transplant} summarises the pipeline.
+
+\begin{algorithm}[!t]
+\caption{Tokenizer transplantation (\file{src/transplant/})}
+\label{alg:transplant}
+\KwIn{$\mathbf{E}_B,\ \mathbf{E}_D$; anchors $\mathcal{A}$; unfamiliar $\mathcal{V}_{\mathrm{unf}}$; method $\in\{$omp, mean, random$\}$; $k{=}64$, $m{=}256$, seed 0}
+\KwOut{transplanted checkpoint with donor tokenizer}
+$\tilde{\mathbf{D}}_{\mathcal{A}}\leftarrow$ row-normalise $\mathbf{E}_D[\mathcal{A}]$\; $\mathbf{B}_{\mathcal{A}}\leftarrow\mathbf{E}_B[\mathcal{A}]$ (unnormalised)\;
+\ForEach{$v\in\mathcal{V}_{\mathrm{unf}}$ \emph{(batches of 256)}}{
+  $\tilde{\mathbf{d}}_v\leftarrow\mathbf{E}_D[v]/\|\mathbf{E}_D[v]\|$\;
+  $\mathcal{C}(v)\leftarrow$ top-$m$ anchors by $\tilde{\mathbf{d}}_v^{\top}\tilde{\mathbf{d}}_a$, sorted descending\;
+  \uIf{method = omp}{$\bm{\alpha}\leftarrow\mathrm{OMP}(\tilde{\mathbf{d}}_v,\tilde{\mathbf{D}}_{\mathcal{C}(v)},k)$ \tcp*[r]{\eqref{eq:omp}}}
+  \uElseIf{method = mean}{$\bm{\alpha}\leftarrow\tfrac1k$ on first $k$ candidates \tcp*[r]{\eqref{eq:mean}}}
+  \Else{$\bm{\alpha}\leftarrow$ random coefficients on $k$ drawn cand.\ \tcp*[r]{\eqref{eq:random}}}
+  $\hat{\mathbf{b}}_v\leftarrow\bm{\alpha}^{\top}\mathbf{B}_{\mathcal{C}(v)}$ \tcp*[r]{coefficient transfer, \eqref{eq:transfer}}
+}
+$\mathbf{E}'\leftarrow$ resize to $V_D$\; $\mathbf{E}'[a]\leftarrow\mathbf{E}_B[u_a]$ for $(a,u_a)\in\mathcal{A}$; align special rows\; $\mathbf{E}'[v]\leftarrow\hat{\mathbf{b}}_v$ for $v\in\mathcal{V}_{\mathrm{unf}}$\;
+rescale each $\mathbf{E}'[v]$ to $\operatorname{median}_a\|\mathbf{E}'[a]\|$ \tcp*[r]{\eqref{eq:rescale}}
+install $\mathbf{E}'$ as input table and tied output rows\; save with donor tokenizer\;
+run identity, round-trip, forward-pass controls (Sec.~\ref{sec:method:fidelity})\;
+\end{algorithm}
+
+\subsection{Fidelity controls}
+\label{sec:method:fidelity}
+Before any training, each artefact passes controls that rule out serialisation and bookkeeping errors (Table~\ref{tab:fidelity}). The \emph{identity} control maps the base vocabulary onto itself through the same anchor machinery, writes the embedding matrix, saves and reloads the model, and compares a forward pass: the embedding tables are bit-identical after the round trip, the maximum absolute logit difference is $0.0$, and there are no canonical-key collisions. These checks establish that the transplant we evaluated is the transplant we built; they say nothing about whether reconstructed rows carry useful lexical information, which is the subject of the intrinsic diagnostics in Section~\ref{sec:res:intrinsic}.
+
+\begin{table*}[!t]
+\caption{Fidelity controls per base (\file{results/controls\_\_\{base\}.json}, \file{results/transplant\_\_\{base\}\_\_*\_rescaled.json}). Ratios are reconstructed-to-anchor median norms of the installed OMP / Mean / Random artefacts after Eq.~\eqref{eq:rescale}.}
+\label{tab:fidelity}
+\centering
+\footnotesize
+\begin{tabular}{@{}lcccccl@{}}
+\toprule
+Base & Identity matrix & Key collisions & Round trip bit-exact & Max $|\Delta\,\mathrm{logit}|$ & Logits identical & Norm ratios OMP / Mean / Random \\
+\midrule
+\input{tables/tab_fidelity}
+\end{tabular}
+\end{table*}
+
+\subsection{Turkish intermediate stage and the word-shuffled control}
+\label{sec:method:turkish}
+Real Turkish training fine-tunes the encoder with a three-class sentiment head on 18{,}000 retained TRSAv1 examples \cite{aydogan2023trsav1} for two epochs, evaluating on 2{,}000 held-out Turkish examples per epoch; its product is the end-of-training checkpoint, built once per (base, tokenizer, corpus, seed)---30 distinct checkpoints, produced serially in a first phase---and reused read-only by the Azerbaijani stage. For \OMPTR{} the Turkish stage runs on the transplanted model, so the Turkish stage itself is affected by the transplant. The shuffled control applies the identical procedure to a corpus in which the whitespace-delimited words of each example are independently permuted, keeping the example's label and word multiset. The manipulation changed word order in 19{,}561 of 20{,}000 examples (97.805\%) and preserved every multiset (\file{results/scramble.json}). Shuffling changes order, fluency, and source-task difficulty together, so real-minus-shuffled is an \emph{order-sensitive} contrast, not a syntax-only intervention.
+
+Source-stage quality is recorded, not assumed: every Turkish-bearing run stores its Turkish validation \Fone{} and a degeneracy flag (\Fone{}$<0.40$ or constant prediction over three classes). Degenerate stages are \emph{reported}, never excluded, because excluding failed source stages would be an outcome-based exclusion.
+
+\subsection{Task-head reset}
+\label{sec:method:head}
+After the Turkish checkpoint is loaded, every module outside the encoder prefix is re-initialised with the model's own initialiser, for every condition, so that no arm carries a differently aged head: 2{,}050 \pfx{sequence\_summary} parameters for \xlmxv{} and 592{,}130 \pfx{classifier} parameters for \xlmr{}, recorded per run. This closes a defect found by a forensic audit of an earlier grid, in which \pfx{ignore\_mismatched\_sizes} re-initialised only the shape-mismatched output projection and silently carried the Turkish-trained dense projection into the Azerbaijani stage (Amendment~8.3). Consequently any Turkish-stage effect must pass through the encoder.
+
+\subsection{Two-stage training and checkpoint selection}
+\label{sec:method:training}
+Algorithm~\ref{alg:training} gives the per-run procedure. All Azerbaijani runs use 2{,}000 optimizer steps regardless of $n$, so that update opportunity is held constant: an epoch budget would give roughly 63, 313, 1{,}250 and 6{,}250 steps across the size range and could prevent escape in the small cells by construction. Under the fixed budget the model sees the training subset about 125, 31.7, 6.4 and 3.1 times at $n=500$, 2{,}000, 10{,}000 and 20{,}914 respectively; the size sweep is therefore a fixed-budget stress test, not a converged learning curve. Validation \Fone{} is recorded at every 200 steps; a checkpoint is saved at each evaluation point with \pfx{save\_total\_limit}\,$=1$; the best-by-\Fone{} checkpoint is restored at the end and \emph{re-scored on validation}, and the run aborts if the restored score differs from the recorded maximum by more than $10^{-4}$. Only then is the fixed test split evaluated, once, with predictions stored and an entry appended to a persistent ledger. Early stopping is disabled, so every run trains all 2{,}000 steps and the collapse diagnostics see the full history.
+
+\begin{algorithm}[!t]
+\caption{One run $(B,c,n,s)$ (\file{src/training/finetune.py})}
+\label{alg:training}
+\KwIn{base $B$, condition $c=(\kappa,\pi)$, size $n$, seed $s$; frozen hyperparameters (Table~\ref{tab:hparams})}
+set all seeds to $s$; deterministic algorithms on\;
+load checkpoint for $\kappa$ (original base, or transplanted artefact of $B$)\;
+\If{$\pi\neq$ none}{
+  \lIf{cache hit for $(B,s,\pi)$}{load Turkish checkpoint}
+  \lElse{train 3-class head on 18k (shuffled) TR, 2 epochs; record TR \Fone; cache}
+}
+reset every non-encoder module (task head); record what was reset\;
+sample $n$ Azerbaijani training examples deterministically for seed $s$\;
+\For{$t=1$ \KwTo $2000$}{
+  AdamW step: batch 32, lr $2{\cdot}10^{-5}$, warm-up 10\%, wd 0.01, fp16\;
+  \If{$t \bmod 200 = 0$}{record $F(t)$ on validation; save checkpoint (keep best)}
+}
+$E\leftarrow\mathbf{1}[\max_t F(t)>0.40]$; $t^\ast\leftarrow$ earliest argmax \tcp*[r]{Eqs.~\eqref{eq:escape},\eqref{eq:select}}
+restore $t^\ast$; re-score validation; \textbf{abort} if $|F_{\text{restored}}-F(t^\ast)|>10^{-4}$\;
+evaluate test split once; store predictions; append ledger entry\;
+write schema-v4 record (history, selection, test, TR stage, reset, runtime)\;
+\end{algorithm}
+
+\subsection{Statistical analysis plan}
+\label{sec:method:stats}
+All inference is within base and was fixed before the grid. For a cell, the escape count $x$ of $N$ seeds gets a Wilson 95\% interval \cite{wilson1927probable},
+\begin{equation}
+\frac{\hat p+\frac{z^2}{2N}\pm z\sqrt{\frac{\hat p(1-\hat p)}{N}+\frac{z^2}{4N^2}}}{1+\frac{z^2}{N}},\qquad z=1.96,
+\label{eq:wilson}
+\end{equation}
+and $\bar F_{\mathrm{cond}}$, $\bar F_{\mathrm{all}}$ get 10{,}000-resample percentile bootstrap intervals \cite{efron1993bootstrap}. For a contrast between conditions $A$ and $C$ at the same base and size, escape rates are compared by Fisher's exact test (diagnostic). The \emph{primary family} compares conditional \Fone{} by Welch's $t$ \cite{welch1947generalization},
+\begin{equation}
+t=\frac{\bar F_C-\bar F_A}{\sqrt{s_C^2/n_C+s_A^2/n_A}},\qquad
+\nu=\frac{(s_C^2/n_C+s_A^2/n_A)^2}{\frac{(s_C^2/n_C)^2}{n_C-1}+\frac{(s_A^2/n_A)^2}{n_A-1}},
+\label{eq:welch}
+\end{equation}
+over escaped seeds, and is \emph{measurable} only if both arms have at least two escaped seeds; 86 of the 96 declared contrasts are measurable. The family-wise error is controlled by Holm's step-down rule \cite{holm1979simple}: with ordered raw $p_{(1)}\le\dots\le p_{(M)}$, $M=86$,
+\begin{equation}
+p^{\mathrm{Holm}}_{(i)}=\max_{j\le i}\min\big\{(M-j+1)\,p_{(j)},\,1\big\},
+\label{eq:holm}
+\end{equation}
+and a contrast \emph{survives} if $p^{\mathrm{Holm}}<0.05$ (the plain Bonferroni threshold is $0.05/86=5.81\times10^{-4}$). Same-seed paired $t$ tests on seeds escaped in both arms, all-seed paired tests, Cohen's $d$, and Fisher tests are reported as diagnostics or sensitivity analyses and are not members of the adjusted family. Test-split inference is restricted to \emph{confirmation}: the 27 validation survivors are re-tested with a paired $t$ on test scores, Holm-corrected within the 27; no new family is discovered on test. Finally, because five paired seeds admit only $2^5=32$ sign assignments, the exact two-sided sign-flip $p$-value \cite{good2005permutation},
+\begin{equation}
+p_{\mathrm{exact}}=\frac{1}{32}\sum_{\bm{\sigma}\in\{\pm1\}^5}\mathbf{1}\Big[\big|\bar\delta_{\bm{\sigma}}\big|\ge\big|\bar\delta\big|\Big]\ \ge\ \frac{2}{32}=0.0625,
+\label{eq:signflip}
+\end{equation}
+with $\bar\delta_{\bm{\sigma}}=\tfrac15\sum_i\sigma_i\delta_i$ the sign-flipped mean of the five paired seed differences $\delta_i$ and $\bar\delta$ the observed mean,
+can never reach $0.05$; parametric survivors are therefore reported as model-based evidence, and \eqref{eq:signflip} is computed for each of them as the distribution-free bound. Algorithm~\ref{alg:stats} summarises the family logic.
+
+\begin{algorithm}[!t]
+\caption{Inference family (\file{src/analysis/stats.py})}
+\label{alg:stats}
+\ForEach{base $B$, size $n$, unordered pair $\{A,C\}$ of conditions run at $(B,n)$}{
+  Fisher exact test on escape counts (diagnostic)\;
+  \If{$\#\mathrm{esc}(A)\ge2$ \KwSty{and} $\#\mathrm{esc}(C)\ge2$}{
+    Welch $t$ on cond.\ \Fone; bootstrap CI; Cohen's $d$ \tcp*[r]{primary family}
+  }
+  \lElse{mark \textsc{not measured}}
+  \lIf{$\ge2$ shared escaped seeds}{paired $t$ (diagnostic)}
+  all-seed paired $t$ (sensitivity)\;
+}
+Holm-adjust the 86 Welch $p$; survivors $\leftarrow\{p^{\mathrm{Holm}}<0.05\}$ \tcp*[r]{\eqref{eq:holm}}
+\ForEach{survivor}{paired $t$ on test \Fone; Holm within survivors; exact sign-flip $p$ \tcp*[r]{\eqref{eq:signflip}}}
+\end{algorithm}

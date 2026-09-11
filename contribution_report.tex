@@ -1,0 +1,78 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{newtxtext}
+\usepackage{booktabs}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage[margin=1.45cm]{geometry}
+\usepackage{xcolor}
+\pagestyle{empty}
+\setlength{\parindent}{0pt}
+\setlength{\parskip}{4pt}
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{M}{>{\raggedright\arraybackslash}p{3.05cm}}
+
+\begin{document}
+
+\begin{center}
+{\Large\bfseries Team Contribution Report}\\[3pt]
+{\large Cross-lingual Transfer between Azerbaijani and Turkish}\\[3pt]
+\texttt{github.com/shahinsafarli/az-tokenizer-project}
+\end{center}
+
+\small
+The project was divided into five balanced technical work packages. Through the
+code, configuration, testing, and evidence phase (PR01--PR20), every member owns
+four repository commits. Each member contributed to both implementation and a
+separate validation or evidence area. The final submission artifacts were
+reviewed jointly by the team.
+
+\begin{tabularx}{\textwidth}{@{}Mp{1.35cm}Y@{}}
+\toprule
+\textbf{Member} & \textbf{Share} & \textbf{Primary contributions and repository evidence} \\
+\midrule
+Shahin Safarli & 20\% &
+Repository initialization and protection; canonical tokenization and anchor
+pipeline; training orchestration and grid execution; tokenization findings and
+overlap figure (PR01, PR03, PR08, PR16). \\
+\addlinespace
+Suleyman Allahverdiyev & 20\% &
+Shared runtime utilities; aggregation, statistics, decomposition, error and
+figure diagnostics; one-command reproduction resources; statistical outputs,
+test ledger, and compressed run/log evidence (PR02, PR07, PR13, PR20). \\
+\addlinespace
+Fatima Alibabayeva & 20\% &
+Dataset preparation, splitting, scrambling and truncation; data audits,
+stability diagnostics and training controls; core CI tests; aggregate split,
+error and label-agreement evidence (PR04, PR09, PR14, PR17). \\
+\addlinespace
+Fidan Baghirova & 20\% &
+Fine-tuning engine; fertility, corpus and diacritic analysis; experiment
+configuration and parallel-execution tests; aggregate tables, paper summaries,
+and principal result figures (PR05, PR10, PR12, PR19). \\
+\addlinespace
+Emil Jafarov & 20\% &
+Embedding-transplant primitives and evaluation; transplant controls, builders,
+cross-base comparisons and reporting; end-to-end tests and frozen configuration
+locks; transplant, norm, control and top-1 findings (PR06, PR11, PR15, PR18). \\
+\bottomrule
+\end{tabularx}
+
+\vspace{5pt}
+\textbf{Shared finalization.} The team jointly checked the final report,
+presentation, contribution statement, repository structure, source archive,
+results archive, and release readiness. Report claims are backed by committed
+aggregate results and the SHA-256-verified archive containing 164 run records and
+164 logs.
+
+\textbf{Verification record.} The complete non-slow test suite passed with 90
+tests and one slow test deselected. Configuration hashes, result JSON/CSV files,
+figures, split manifests, archive membership, and the 164-entry held-out-test
+ledger were checked before submission.
+
+\textbf{Contribution declaration.} The percentages summarize the agreed overall
+division of project work. All team members reviewed and accept responsibility
+for the submitted code, experimental evidence, paper, and presentation.
+
+\end{document}
